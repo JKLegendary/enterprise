@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stall POS</title>
 
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
 
-  <!-- Firebase (compat for simple CDN usage) -->
+  <!-- Firebase CDN -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
@@ -54,7 +54,7 @@
         </div>
       </div>
 
-      <!-- PAY MODAL (hidden by inline style) -->
+      <!-- PAY MODAL -->
       <div id="payModal" class="modal" style="display:none;">
         <div class="modal-card">
           <h2>Take payment</h2>
@@ -75,7 +75,7 @@
         </div>
       </div>
 
-      <!-- ITEMS EDITOR MODAL (hidden by inline style) -->
+      <!-- ITEMS EDITOR MODAL -->
       <div id="itemsModal" class="modal" style="display:none;">
         <div class="modal-card">
           <h2>Items</h2>
@@ -129,13 +129,18 @@
         <div class="pane">
           <div class="pane-head"><h2>Soundboard</h2></div>
           <div id="soundboard" class="grid"></div>
-          <p class="tiny">Tap a number to announce it. (Uses device voice)</p>
+          <p class="tiny">Tap a number to announce it.</p>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- Keep at bottom -->
-  <script src="./app.js"></script>
+  <!-- Status bar -->
+  <div id="statusBar" style="position:fixed;left:0;right:0;bottom:0;padding:8px 10px;font:14px system-ui;background:#11131a;border-top:1px solid #20243a;z-index:9999;">
+    Status: <span id="statusText">Loading JS…</span>
+  </div>
+
+  <!-- Cache-busted app.js -->
+  <script src="./app.js?v=6"></script>
 </body>
 </html>
