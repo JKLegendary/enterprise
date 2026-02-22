@@ -1,8 +1,41 @@
 /***********************
  * CONFIG
  ***********************/
-const STALL_PIN = "1234"; // Basic gate only. Not secure.
+/***********************
+ * PASSCODE GATE FIRST
+ ***********************/
+const STALL_PIN = "1234"; // basic gate only
 
+const el = (id) => document.getElementById(id);
+
+function initGate() {
+  const gate = el("gate");
+  const unlocked = sessionStorage.getItem("unlocked") === "1";
+
+  if (unlocked) gate.classList.add("hidden");
+
+  el("pinBtn").onclick = () => {
+    const pin = el("pinInput").value.trim();
+    if (pin === STALL_PIN) {
+      sessionStorage.setItem("unlocked", "1");
+      gate.classList.add("hidden");
+      el("pinErr").textContent = "";
+    } else {
+      el("pinErr").textContent = "Incorrect passcode.";
+    }
+  };
+
+  // optional: press Enter to unlock
+  el("pinInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") el("pinBtn").click();
+  });
+}
+
+initGate();
+
+/***********************
+ * FIREBASE AFTER GATE
+ ***********************/
 const firebaseConfig = {
   apiKey: "AIzaSyARBfapCjXLkhlmuTKT9lJRbLLAc6u0jU0",
   authDomain: "enterprise-d157a.firebaseapp.com",
@@ -15,6 +48,8 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// ...the rest of your app code (subscriptions, render, etc.) below
 
 /***********************
  * STATE
