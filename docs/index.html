@@ -1,1 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stall POS</title>
+  <link rel="stylesheet" href="./styles.css" />
 
+  <!-- Firebase (compat for simple CDN usage) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Passcode Gate -->
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <h1>Enter Passcode</h1>
+      <input id="pinInput" type="password" inputmode="numeric" placeholder="Passcode" />
+      <button id="pinBtn">Unlock</button>
+      <p id="pinErr" class="err"></p>
+      <p class="tiny">Note: this PIN is a basic gate. For real security, use Firebase Auth + rules.</p>
+    </div>
+  </div>
+
+  <!-- App Shell -->
+  <header class="topbar">
+    <div class="brand">Stall POS</div>
+    <nav class="nav">
+      <button class="navbtn" data-view="cashier">Cashier</button>
+      <button class="navbtn" data-view="cook">Cook</button>
+      <button class="navbtn" data-view="completion">Completion</button>
+      <button class="navbtn" data-view="history">History</button>
+    </nav>
+  </header>
+
+  <main id="app" class="app">
+    <!-- Cashier -->
+    <section id="view-cashier" class="view">
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Menu</h2>
+            <button id="editItemsBtn" class="ghost">Items ✏️</button>
+          </div>
+          <div id="itemsGrid" class="grid"></div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Cart</h2>
+            <button id="clearCartBtn" class="ghost">Clear</button>
+          </div>
+          <div id="cartList" class="list"></div>
+
+          <div class="totals">
+            <div class="row"><span>Total</span><strong id="cartTotal">£0.00</strong></div>
+            <button id="payBtn" class="primary">Pay</button>
+          </div>
+
+          <div class="subpanel">
+            <h3>Ready orders</h3>
+            <div id="cashierReadyList" class="list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pay modal -->
+      <div id="payModal" class="modal hidden">
+        <div class="modal-card">
+          <h2>Take payment</h2>
+          <div class="row"><span>Amount due</span><strong id="dueAmt">£0.00</strong></div>
+          <label class="label">Amount given</label>
+          <input id="givenInput" type="number" inputmode="decimal" placeholder="0.00" />
+          <div class="row"><span>Change</span><strong id="changeAmt">£0.00</strong></div>
+
+          <div class="actions">
+            <button id="cancelPayBtn" class="ghost">Cancel</button>
+            <button id="completePayBtn" class="primary">Complete</button>
+          </div>
+
+          <p id="payErr" class="err"></p>
+        </div>
+      </div>
+
+      <!-- Item editor modal -->
+      <div id="itemsModal" class="modal hidden">
+        <div class="modal-card">
+          <h2>Items</h2>
+          <div class="row">
+            <input id="newItemName" placeholder="Name (e.g., Burger)" />
+            <input id="newItemPrice" type="number" inputmode="decimal" placeholder="Price" />
+          </div>
+          <input id="newItemNotes" placeholder="Notes (optional)" />
+          <div class="actions">
+            <button id="closeItemsBtn" class="ghost">Close</button>
+            <button id="addItemBtn" class="primary">Add item</button>
+          </div>
+          <hr />
+          <div id="itemsAdminList" class="list"></div>
+          <p class="tiny">Tip: long-press on iPad can help with text selection.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cook -->
+    <section id="view-cook" class="view hidden">
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head"><h2>Cooking</h2></div>
+          <div id="cookOrders" class="list"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-head"><h2>Instructions</h2></div>
+          <p>Tap an order to expand. Tap ✅ to mark ready.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Completion -->
+    <section id="view-completion" class="view hidden">
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head"><h2>Ready</h2></div>
+          <div id="readyOrders" class="list"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-head"><h2>Soundboard</h2></div>
+          <div id="soundboard" class="grid"></div>
+          <p class="tiny">Uses the device/speaker voice (Web Speech API). iPad needs volume up.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section id="view-history" class="view hidden">
+      <div class="pane">
+        <div class="pane-head"><h2>Order History</h2></div>
+        <div id="historyList" class="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
