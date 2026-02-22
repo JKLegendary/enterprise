@@ -23,22 +23,17 @@ const db = firebase.firestore();
 /***********************
  * STATE
  ***********************/
-let currentView = "cashier";
-let items = [];              // menu items
-let cart = new Map();        // itemId -> {item, qty}
-let unsubscribeFns = [];
+let items = [];
+let cart = new Map();
 
 /***********************
- * VIEW NAV
+ * NAV
  ***********************/
 function setView(view) {
-  currentView = view;
-
   document.querySelectorAll(".navbtn").forEach(b => {
     b.classList.toggle("active", b.dataset.view === view);
   });
-
-  ["cashier","cook","completion","history"].forEach(v => {
+  ["cashier","cook","history","completion"].forEach(v => {
     el(`view-${v}`).classList.toggle("hidden", v !== view);
   });
 }
@@ -50,22 +45,32 @@ function initNav() {
 }
 
 /***********************
- * ITEMS (menu) - realtime
+ * MODALS (bulletproof)
+ ***********************/
+function showModal(id) {
+  const m = el(id);
+  m.style.display = "flex";
+}
+function hideModal(id) {
+  const m = el(id);
+  m.style.display = "none";
+}
+
+/***********************
+ * ITEMS (menu)
  ***********************/
 function subscribeItems() {
-  const unsub = db.collection("items").orderBy("createdAt", "asc")
+  db.collection("items").orderBy("createdAt", "asc")
     .onSnapshot((snap) => {
       items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderItemsGrid();
       renderItemsAdminList();
     });
-  unsubscribeFns.push(unsub);
 }
 
 function renderItemsGrid() {
   const grid = el("itemsGrid");
   grid.innerHTML = "";
-
   for (const it of items) {
     const btn = document.createElement("button");
     btn.className = "card";
@@ -81,7 +86,6 @@ function renderItemsGrid() {
 function renderItemsAdminList() {
   const list = el("itemsAdminList");
   list.innerHTML = "";
-
   for (const it of items) {
     const card = document.createElement("div");
     card.className = "card";
@@ -94,12 +98,10 @@ function renderItemsAdminList() {
         <button class="ghost">Delete</button>
       </div>
     `;
-
     card.querySelector("button").onclick = async () => {
       if (!confirm(`Delete "${it.name}"?`)) return;
       await db.collection("items").doc(it.id).delete();
     };
-
     list.appendChild(card);
   }
 }
@@ -109,8 +111,7 @@ async function addItemFromModal() {
   const price = Number(el("newItemPrice").value);
   const notes = el("newItemNotes").value.trim();
 
-  if (!name) return;
-  if (!Number.isFinite(price)) return;
+  if (!name || !Number.isFinite(price)) return;
 
   await db.collection("items").add({
     name,
@@ -125,7 +126,7 @@ async function addItemFromModal() {
 }
 
 /***********************
- * CART + CASHIER FLOW
+ * CART
  ***********************/
 function addToCart(itemId) {
   const it = items.find(x => x.id === itemId);
@@ -192,17 +193,16 @@ function renderCart() {
   el("cartTotal").textContent = £(cartTotal());
 }
 
+/***********************
+ * PAY FLOW
+ ***********************/
 function openPay() {
   if (cart.size === 0) return;
   el("payErr").textContent = "";
   el("givenInput").value = "";
   el("dueAmt").textContent = £(cartTotal());
   el("changeAmt").textContent = £(0);
-  el("payModal").classList.remove("hidden");
-}
-
-function closePay() {
-  el("payModal").classList.add("hidden");
+  showModal("payModal");
 }
 
 function calcChange() {
@@ -222,24 +222,15 @@ async function completePayment() {
     return;
   }
 
-  // Build order lines
   const lines = [];
   for (const { item, qty } of cart.values()) {
-    lines.push({
-      itemId: item.id,
-      name: item.name,
-      price: item.price,
-      qty,
-      notes: item.notes || ""
-    });
+    lines.push({ itemId: item.id, name: item.name, price: item.price, qty, notes: item.notes || "" });
   }
 
-  // Atomic order number + create order
   try {
     await db.runTransaction(async (tx) => {
       const counterRef = db.collection("meta").doc("counters");
       const counterSnap = await tx.get(counterRef);
-
       const next = (counterSnap.exists && counterSnap.data().nextOrderNumber)
         ? counterSnap.data().nextOrderNumber
         : 1;
@@ -263,7 +254,7 @@ async function completePayment() {
 
     cart.clear();
     renderCart();
-    closePay();
+    hideModal("payModal");
     alert("Order sent to kitchen ✅");
   } catch (e) {
     console.error(e);
@@ -275,14 +266,13 @@ async function completePayment() {
  * COOK VIEW
  ***********************/
 function subscribeCookingOrders() {
-  const unsub = db.collection("orders")
+  db.collection("orders")
     .where("status", "==", "COOKING")
     .orderBy("paidAt", "desc")
     .onSnapshot((snap) => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderCookOrders(orders);
     });
-  unsubscribeFns.push(unsub);
 }
 
 function renderCookOrders(orders) {
@@ -311,7 +301,7 @@ function renderCookOrders(orders) {
 
     const details = card.querySelector(".details");
     card.onclick = (ev) => {
-      if (ev.target.tagName === "BUTTON") return; // don't toggle when tapping ✅
+      if (ev.target.tagName === "BUTTON") return;
       details.classList.toggle("hidden");
     };
 
@@ -328,25 +318,23 @@ function renderCookOrders(orders) {
 }
 
 /***********************
- * READY / COMPLETION VIEW
+ * READY / COMPLETION
  ***********************/
 function subscribeReadyOrders() {
-  const unsub = db.collection("orders")
+  db.collection("orders")
     .where("status", "==", "READY")
     .orderBy("readyAt", "desc")
     .onSnapshot((snap) => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderCashierReady(orders);
       renderReadyOrders(orders);
       renderSoundboard(orders);
-      renderCashierReady(orders);
     });
-  unsubscribeFns.push(unsub);
 }
 
 function renderCashierReady(orders) {
   const list = el("cashierReadyList");
   list.innerHTML = "";
-
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
@@ -358,7 +346,6 @@ function renderCashierReady(orders) {
 function renderReadyOrders(orders) {
   const list = el("readyOrders");
   list.innerHTML = "";
-
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
@@ -397,31 +384,26 @@ function speak(text) {
 function renderSoundboard(orders) {
   const board = el("soundboard");
   board.innerHTML = "";
-
   for (const o of orders) {
     const btn = document.createElement("button");
     btn.className = "card";
-    btn.innerHTML = `
-      <div style="font-weight:900;font-size:22px;">#${o.number}</div>
-      <div class="tiny">Tap to announce</div>
-    `;
+    btn.innerHTML = `<div style="font-weight:900;font-size:22px;">#${o.number}</div><div class="tiny">Tap to announce</div>`;
     btn.onclick = () => speak(`Order ${o.number} is ready`);
     board.appendChild(btn);
   }
 }
 
 /***********************
- * HISTORY VIEW
+ * HISTORY
  ***********************/
 function subscribeHistory() {
-  const unsub = db.collection("orders")
+  db.collection("orders")
     .orderBy("createdAt", "desc")
     .limit(200)
     .onSnapshot((snap) => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderHistory(orders);
     });
-  unsubscribeFns.push(unsub);
 }
 
 function renderHistory(orders) {
@@ -457,32 +439,35 @@ function renderHistory(orders) {
 }
 
 /***********************
- * UI INIT
+ * INIT
  ***********************/
 function initCashierUi() {
   el("clearCartBtn").onclick = () => { cart.clear(); renderCart(); };
 
   el("payBtn").onclick = openPay;
-  el("cancelPayBtn").onclick = closePay;
+  el("cancelPayBtn").onclick = () => hideModal("payModal");
   el("completePayBtn").onclick = completePayment;
   el("givenInput").oninput = calcChange;
 
-  el("editItemsBtn").onclick = () => el("itemsModal").classList.remove("hidden");
-  el("closeItemsBtn").onclick = () => el("itemsModal").classList.add("hidden");
+  // IMPORTANT: only opens when pencil clicked
+  el("editItemsBtn").onclick = () => showModal("itemsModal");
+  el("closeItemsBtn").onclick = () => hideModal("itemsModal");
   el("addItemBtn").onclick = addItemFromModal;
+
+  // Close modals if you tap the dark background
+  el("itemsModal").onclick = (e) => { if (e.target === el("itemsModal")) hideModal("itemsModal"); };
+  el("payModal").onclick = (e) => { if (e.target === el("payModal")) hideModal("payModal"); };
 }
 
 function boot() {
   initNav();
   initCashierUi();
-
   setView("cashier");
   renderCart();
 
-  // Realtime subscriptions
   subscribeItems();
-  subscribeReadyOrders();     // used by Cashier + Completion
   subscribeCookingOrders();
+  subscribeReadyOrders();
   subscribeHistory();
 }
 
