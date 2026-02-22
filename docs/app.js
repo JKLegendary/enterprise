@@ -4,10 +4,13 @@
 const STALL_PIN = "1234"; // Basic gate only. Not secure.
 
 const firebaseConfig = {
-  // TODO: paste your Firebase web config here
-  // apiKey: "...",
-  // authDomain: "...",
-  // projectId: "...",
+  apiKey: "AIzaSyARBfapCjXLkhlmuTKT9lJRbLLAc6u0jU0",
+  authDomain: "enterprise-d157a.firebaseapp.com",
+  projectId: "enterprise-d157a",
+  storageBucket: "enterprise-d157a.firebasestorage.app",
+  messagingSenderId: "776029370493",
+  appId: "1:776029370493:web:7117b4338120ac89719914",
+  measurementId: "G-3FBXQ78259"
 };
 
 firebase.initializeApp(firebaseConfig);
