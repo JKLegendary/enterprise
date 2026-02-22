@@ -11,17 +11,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
 <body>
-  <!-- Passcode Gate -->
-  <div id="gate" class="gate">
-    <div class="gate-card">
-      <h1>Enter Passcode</h1>
-      <input id="pinInput" type="password" inputmode="numeric" placeholder="Passcode" />
-      <button id="pinBtn">Unlock</button>
-      <p id="pinErr" class="err"></p>
-      <p class="tiny">Note: this PIN is a basic gate. For real security, use Firebase Auth + rules.</p>
-    </div>
-  </div>
-
   <!-- App Shell -->
   <header class="topbar">
     <div class="brand">Stall POS</div>
@@ -140,6 +129,7 @@
     </section>
   </main>
 
+  <!-- IMPORTANT: keep this at the bottom so DOM exists before JS runs -->
   <script src="./app.js"></script>
 </body>
 </html>
