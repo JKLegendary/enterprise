@@ -1,40 +1,11 @@
 /***********************
- * CONFIG
+ * HELPERS
  ***********************/
-/***********************
- * PASSCODE GATE FIRST
- ***********************/
-const STALL_PIN = "1234"; // basic gate only
-
 const el = (id) => document.getElementById(id);
-
-function initGate() {
-  const gate = el("gate");
-  const unlocked = sessionStorage.getItem("unlocked") === "1";
-
-  if (unlocked) gate.style.display = "none";
-
-el("pinBtn").onclick = () => {
-  const pin = el("pinInput").value.trim();
-  if (pin === STALL_PIN) {
-    sessionStorage.setItem("unlocked", "1");
-    gate.style.display = "none";
-    el("pinErr").textContent = "";
-  } else {
-    el("pinErr").textContent = "Incorrect passcode.";
-  }
-};
-
-  // optional: press Enter to unlock
-  el("pinInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") el("pinBtn").click();
-  });
-}
-
-initGate();
+const £ = (n) => `£${(Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2)}`;
 
 /***********************
- * FIREBASE AFTER GATE
+ * FIREBASE CONFIG
  ***********************/
 const firebaseConfig = {
   apiKey: "AIzaSyARBfapCjXLkhlmuTKT9lJRbLLAc6u0jU0",
@@ -49,59 +20,37 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ...the rest of your app code (subscriptions, render, etc.) below
-
 /***********************
  * STATE
  ***********************/
 let currentView = "cashier";
 let items = [];              // menu items
-let cart = new Map();        // itemId -> {item, qty, notesOverride?}
+let cart = new Map();        // itemId -> {item, qty}
 let unsubscribeFns = [];
 
 /***********************
- * UTIL
+ * VIEW NAV
  ***********************/
-const £ = (n) => `£${(Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2)}`;
-const el = (id) => document.getElementById(id);
-
-function clearUnsubs() {
-  unsubscribeFns.forEach((fn) => { try { fn(); } catch {} });
-  unsubscribeFns = [];
-}
-
 function setView(view) {
   currentView = view;
+
   document.querySelectorAll(".navbtn").forEach(b => {
     b.classList.toggle("active", b.dataset.view === view);
   });
+
   ["cashier","cook","completion","history"].forEach(v => {
     el(`view-${v}`).classList.toggle("hidden", v !== view);
   });
 }
 
-/***********************
- * PASSCODE GATE
- ***********************/
-function initGate() {
-  const gate = el("gate");
-  const unlocked = sessionStorage.getItem("unlocked") === "1";
-  if (unlocked) gate.style.display = "none";
-
-  el("pinBtn").onclick = () => {
-    const pin = el("pinInput").value.trim();
-    if (pin === STALL_PIN) {
-      sessionStorage.setItem("unlocked", "1");
-      gate.style.display = "none";
-      el("pinErr").textContent = "";
-    } else {
-      el("pinErr").textContent = "Incorrect passcode.";
-    }
-  };
+function initNav() {
+  document.querySelectorAll(".navbtn").forEach(b => {
+    b.onclick = () => setView(b.dataset.view);
+  });
 }
 
 /***********************
- * ITEMS (menu)
+ * ITEMS (menu) - realtime
  ***********************/
 function subscribeItems() {
   const unsub = db.collection("items").orderBy("createdAt", "asc")
@@ -116,11 +65,14 @@ function subscribeItems() {
 function renderItemsGrid() {
   const grid = el("itemsGrid");
   grid.innerHTML = "";
+
   for (const it of items) {
     const btn = document.createElement("button");
     btn.className = "card";
-    btn.innerHTML = `<div style="font-weight:900;font-size:18px;">${it.name}</div>
-                     <div style="opacity:.8;margin-top:6px;">${£(it.price)}</div>`;
+    btn.innerHTML = `
+      <div style="font-weight:900;font-size:18px;">${it.name}</div>
+      <div style="opacity:.8;margin-top:6px;">${£(it.price)}</div>
+    `;
     btn.onclick = () => addToCart(it.id);
     grid.appendChild(btn);
   }
@@ -129,6 +81,7 @@ function renderItemsGrid() {
 function renderItemsAdminList() {
   const list = el("itemsAdminList");
   list.innerHTML = "";
+
   for (const it of items) {
     const card = document.createElement("div");
     card.className = "card";
@@ -141,10 +94,12 @@ function renderItemsAdminList() {
         <button class="ghost">Delete</button>
       </div>
     `;
+
     card.querySelector("button").onclick = async () => {
       if (!confirm(`Delete "${it.name}"?`)) return;
       await db.collection("items").doc(it.id).delete();
     };
+
     list.appendChild(card);
   }
 }
@@ -153,7 +108,9 @@ async function addItemFromModal() {
   const name = el("newItemName").value.trim();
   const price = Number(el("newItemPrice").value);
   const notes = el("newItemNotes").value.trim();
-  if (!name || !Number.isFinite(price)) return;
+
+  if (!name) return;
+  if (!Number.isFinite(price)) return;
 
   await db.collection("items").add({
     name,
@@ -173,9 +130,11 @@ async function addItemFromModal() {
 function addToCart(itemId) {
   const it = items.find(x => x.id === itemId);
   if (!it) return;
+
   const existing = cart.get(itemId);
   if (existing) existing.qty += 1;
   else cart.set(itemId, { item: it, qty: 1 });
+
   renderCart();
 }
 
@@ -188,8 +147,10 @@ function cartTotal() {
 function renderCart() {
   const list = el("cartList");
   list.innerHTML = "";
+
   for (const [itemId, entry] of cart.entries()) {
     const { item, qty } = entry;
+
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
@@ -209,6 +170,7 @@ function renderCart() {
         <strong>${£(item.price * qty)}</strong>
       </div>
     `;
+
     const [minusBtn, plusBtn] = card.querySelectorAll("button");
     minusBtn.onclick = () => {
       const e = cart.get(itemId);
@@ -223,6 +185,7 @@ function renderCart() {
       e.qty += 1;
       renderCart();
     };
+
     list.appendChild(card);
   }
 
@@ -253,6 +216,7 @@ async function completePayment() {
   el("payErr").textContent = "";
   const due = cartTotal();
   const given = Number(el("givenInput").value);
+
   if (!Number.isFinite(given) || given < due) {
     el("payErr").textContent = "Amount given must be at least the amount due.";
     return;
@@ -261,7 +225,13 @@ async function completePayment() {
   // Build order lines
   const lines = [];
   for (const { item, qty } of cart.values()) {
-    lines.push({ itemId: item.id, name: item.name, price: item.price, qty, notes: item.notes || "" });
+    lines.push({
+      itemId: item.id,
+      name: item.name,
+      price: item.price,
+      qty,
+      notes: item.notes || ""
+    });
   }
 
   // Atomic order number + create order
@@ -269,7 +239,10 @@ async function completePayment() {
     await db.runTransaction(async (tx) => {
       const counterRef = db.collection("meta").doc("counters");
       const counterSnap = await tx.get(counterRef);
-      const next = (counterSnap.exists && counterSnap.data().nextOrderNumber) ? counterSnap.data().nextOrderNumber : 1;
+
+      const next = (counterSnap.exists && counterSnap.data().nextOrderNumber)
+        ? counterSnap.data().nextOrderNumber
+        : 1;
 
       tx.set(counterRef, { nextOrderNumber: next + 1 }, { merge: true });
 
@@ -315,11 +288,14 @@ function subscribeCookingOrders() {
 function renderCookOrders(orders) {
   const list = el("cookOrders");
   list.innerHTML = "";
+
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
 
-    const linesHtml = o.lines.map(l => `<div class="row"><span>${l.qty}× ${l.name}</span><span>${£(l.price*l.qty)}</span></div>`).join("");
+    const linesHtml = o.lines.map(l =>
+      `<div class="row"><span>${l.qty}× ${l.name}</span><span>${£(l.price * l.qty)}</span></div>`
+    ).join("");
 
     card.innerHTML = `
       <div class="row">
@@ -335,8 +311,7 @@ function renderCookOrders(orders) {
 
     const details = card.querySelector(".details");
     card.onclick = (ev) => {
-      // avoid toggle when pressing the ✅ button
-      if (ev.target.tagName === "BUTTON") return;
+      if (ev.target.tagName === "BUTTON") return; // don't toggle when tapping ✅
       details.classList.toggle("hidden");
     };
 
@@ -371,6 +346,7 @@ function subscribeReadyOrders() {
 function renderCashierReady(orders) {
   const list = el("cashierReadyList");
   list.innerHTML = "";
+
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
@@ -382,6 +358,7 @@ function renderCashierReady(orders) {
 function renderReadyOrders(orders) {
   const list = el("readyOrders");
   list.innerHTML = "";
+
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
@@ -394,6 +371,7 @@ function renderReadyOrders(orders) {
         <button class="ghost" style="width:auto;">Taken</button>
       </div>
     `;
+
     card.querySelector("button").onclick = async () => {
       if (!confirm(`Customer collected Order #${o.number}?`)) return;
       await db.collection("orders").doc(o.id).set({
@@ -401,6 +379,7 @@ function renderReadyOrders(orders) {
         pickedUpAt: Date.now(),
       }, { merge: true });
     };
+
     list.appendChild(card);
   }
 }
@@ -418,10 +397,14 @@ function speak(text) {
 function renderSoundboard(orders) {
   const board = el("soundboard");
   board.innerHTML = "";
+
   for (const o of orders) {
     const btn = document.createElement("button");
     btn.className = "card";
-    btn.innerHTML = `<div style="font-weight:900;font-size:22px;">#${o.number}</div><div class="tiny">Tap to announce</div>`;
+    btn.innerHTML = `
+      <div style="font-weight:900;font-size:22px;">#${o.number}</div>
+      <div class="tiny">Tap to announce</div>
+    `;
     btn.onclick = () => speak(`Order ${o.number} is ready`);
     board.appendChild(btn);
   }
@@ -444,11 +427,14 @@ function subscribeHistory() {
 function renderHistory(orders) {
   const list = el("historyList");
   list.innerHTML = "";
+
   for (const o of orders) {
     const card = document.createElement("div");
     card.className = "card";
 
-    const linesHtml = o.lines.map(l => `<div class="row"><span>${l.qty}× ${l.name}</span><span>${£(l.price*l.qty)}</span></div>`).join("");
+    const linesHtml = o.lines.map(l =>
+      `<div class="row"><span>${l.qty}× ${l.name}</span><span>${£(l.price * l.qty)}</span></div>`
+    ).join("");
 
     card.innerHTML = `
       <div class="row">
@@ -465,21 +451,17 @@ function renderHistory(orders) {
 
     const details = card.querySelector(".details");
     card.querySelector("button").onclick = () => details.classList.toggle("hidden");
+
     list.appendChild(card);
   }
 }
 
 /***********************
- * INIT + EVENTS
+ * UI INIT
  ***********************/
-function initNav() {
-  document.querySelectorAll(".navbtn").forEach(b => {
-    b.onclick = () => setView(b.dataset.view);
-  });
-}
-
 function initCashierUi() {
   el("clearCartBtn").onclick = () => { cart.clear(); renderCart(); };
+
   el("payBtn").onclick = openPay;
   el("cancelPayBtn").onclick = closePay;
   el("completePayBtn").onclick = completePayment;
@@ -491,13 +473,13 @@ function initCashierUi() {
 }
 
 function boot() {
-  initGate();
   initNav();
   initCashierUi();
+
   setView("cashier");
   renderCart();
 
-  // Live subscriptions
+  // Realtime subscriptions
   subscribeItems();
   subscribeReadyOrders();     // used by Cashier + Completion
   subscribeCookingOrders();
