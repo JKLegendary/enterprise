@@ -12,18 +12,18 @@ function initGate() {
   const gate = el("gate");
   const unlocked = sessionStorage.getItem("unlocked") === "1";
 
-  if (unlocked) gate.classList.add("hidden");
+  if (unlocked) gate.style.display = "none";
 
-  el("pinBtn").onclick = () => {
-    const pin = el("pinInput").value.trim();
-    if (pin === STALL_PIN) {
-      sessionStorage.setItem("unlocked", "1");
-      gate.classList.add("hidden");
-      el("pinErr").textContent = "";
-    } else {
-      el("pinErr").textContent = "Incorrect passcode.";
-    }
-  };
+el("pinBtn").onclick = () => {
+  const pin = el("pinInput").value.trim();
+  if (pin === STALL_PIN) {
+    sessionStorage.setItem("unlocked", "1");
+    gate.style.display = "none";
+    el("pinErr").textContent = "";
+  } else {
+    el("pinErr").textContent = "Incorrect passcode.";
+  }
+};
 
   // optional: press Enter to unlock
   el("pinInput").addEventListener("keydown", (e) => {
