@@ -13,6 +13,7 @@ body { margin: 0; background: #0b0c10; color: #eaf0ff; }
 
 .split { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pane { background:#11131a; border:1px solid #20243a; border-radius:14px; padding: 12px; }
+.pane.wide { max-width: 780px; margin: 0 auto; }
 .pane-head { display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; }
 
 .grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; overflow:auto; max-height: 72vh; padding-right: 4px; }
@@ -20,6 +21,7 @@ body { margin: 0; background: #0b0c10; color: #eaf0ff; }
 
 .card { background:#0d0f15; border:1px solid #22263a; border-radius:12px; padding: 10px; }
 .row { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.row.big { font-size: 20px; }
 .tiny { opacity:.7; font-size: 12px; }
 
 .primary { background:#7aa2ff; color:#081022; border:none; padding: 12px; border-radius: 12px; font-weight:900; width:100%; }
@@ -33,7 +35,13 @@ input { width:100%; box-sizing:border-box; padding: 12px; border-radius:12px; bo
 .label { display:block; margin-top: 10px; margin-bottom: 6px; opacity:.85; }
 .err { color:#ff8a8a; min-height: 18px; }
 
-.modal { position:fixed; inset:0; background: rgba(0,0,0,.6); align-items:center; justify-content:center; padding: 14px; z-index: 50; }
-.modal-card { width:min(720px, 100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding: 14px; }
+/* Items modal */
+.modal { position:fixed; inset:0; background: rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding: 14px; z-index: 50; }
+.modal-card { width:min(760px, 100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding: 14px; }
 .actions { display:flex; gap:10px; margin-top: 12px; }
+.actions.single button { width:100%; }
 .actions button { width: 50%; }
+hr { border: none; border-top: 1px solid #20243a; margin: 14px 0; }
+
+/* Cashier pay sub-view */
+.cashier-pay .paybox { display:flex; flex-direction:column; gap: 12px; max-width: 520px; margin: 0 auto; }
