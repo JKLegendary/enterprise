@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Step 1 (Items only)</title>
+
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin: 0; background: #0b0c10; color: #eaf0ff; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; background:#11131a; position:sticky; top:0; z-index:10; }
+    .brand { font-weight:800; }
+    .nav { display:flex; gap:8px; }
+    .navbtn { background:#1b1f2b; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:10px; font-weight:700; }
+    .navbtn.active { outline:2px solid #7aa2ff; }
+
+    .app { padding:12px; padding-bottom:56px; }
+    .view { min-height: calc(100vh - 60px); }
+    .hidden { display:none !important; }
+
+    .pane { background:#11131a; border:1px solid #20243a; border-radius:14px; padding:12px; }
+    .pane-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; overflow:auto; max-height:72vh; padding-right:4px; }
+    .card { background:#0d0f15; border:1px solid #22263a; border-radius:12px; padding:10px; }
+
+    .ghost { background: transparent; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:12px; font-weight:800; }
+    .primary { background:#7aa2ff; color:#081022; border:none; padding:12px; border-radius:12px; font-weight:900; width:100%; }
+    button { touch-action: manipulation; }
+    input { width:100%; box-sizing:border-box; padding:12px; border-radius:12px; border:1px solid #2a3042; background:#0b0c10; color:#eaf0ff; font-size:16px; }
+
+    .modal { position:fixed; inset:0; background: rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+    .modal-card { width:min(820px, 100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding:14px; }
+    .row { display:flex; gap:10px; }
+    hr { border:none; border-top:1px solid #20243a; margin:14px 0; }
+    .statusbar { position:fixed; left:0; right:0; bottom:0; padding:8px 10px; font:14px system-ui; background:#11131a; border-top:1px solid #20243a; z-index:9999; }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">POS Step 1</div>
+    <nav class="nav">
+      <button class="navbtn" data-view="cashier">Cashier</button>
+      <button class="navbtn" data-view="cook">Cook</button>
+      <button class="navbtn" data-view="history">History</button>
+      <button class="navbtn" data-view="completion">Completion</button>
+    </nav>
+  </header>
+
+  <main class="app">
+    <section id="view-cashier" class="view">
+      <div class="pane">
+        <div class="pane-head">
+          <h2>Menu</h2>
+          <button id="editItemsBtn" class="ghost">Items ✏️</button>
+        </div>
+        <div id="itemsGrid" class="grid"></div>
+      </div>
+
+      <!-- Items editor -->
+      <div id="itemsModal" class="modal">
+        <div class="modal-card">
+          <div class="pane-head">
+            <h2>Items</h2>
+            <button id="closeItemsBtn" class="ghost">Close</button>
+          </div>
+
+          <div class="row">
+            <input id="newItemName" placeholder="Name" />
+            <input id="newItemPrice" type="number" inputmode="decimal" placeholder="Price" />
+          </div>
+          <input id="newItemNotes" placeholder="Notes (optional)" />
+
+          <div style="margin-top:12px;">
+            <button id="addItemBtn" class="primary">Add item</button>
+          </div>
+
+          <hr />
+          <div id="itemsAdminList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-cook" class="view hidden"><div class="pane"><h2>Cook</h2></div></section>
+    <section id="view-history" class="view hidden"><div class="pane"><h2>History</h2></div></section>
+    <section id="view-completion" class="view hidden"><div class="pane"><h2>Completion</h2></div></section>
+  </main>
+
+  <div class="statusbar">Status: <span id="statusText">Booting…</span></div>
+
+<script>
+const el = (id) => document.getElementById(id);
+const setStatus = (t) => el("statusText").textContent = t;
+
+function setView(view){
+  document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  ["cashier","cook","history","completion"].forEach(v=>{
+    el(`view-${v}`).classList.toggle("hidden", v !== view);
+  });
+}
+
+function showModal(){ el("itemsModal").style.display = "flex"; }
+function hideModal(){ el("itemsModal").style.display = "none"; }
+
+let menuItems = [];
+
+function renderMenu(){
+  const grid = el("itemsGrid");
+  grid.innerHTML = "";
+  for (const it of menuItems){
+    const btn = document.createElement("button");
+    btn.className = "card";
+    btn.textContent = `${it.name} £${it.price.toFixed(2)}`;
+    grid.appendChild(btn);
+  }
+}
+
+function renderAdmin(){
+  const wrap = el("itemsAdminList");
+  wrap.innerHTML = "";
+  for (const it of menuItems){
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.marginBottom = "10px";
+    div.innerHTML = `<strong>${it.name}</strong> — £${it.price.toFixed(2)}<div style="opacity:.7;font-size:12px;">${it.notes||""}</div>`;
+    wrap.appendChild(div);
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  // nav
+  document.querySelectorAll(".navbtn").forEach(b => b.onclick = () => setView(b.dataset.view));
+  setView("cashier");
+
+  // modal buttons
+  el("editItemsBtn").onclick = showModal;
+  el("closeItemsBtn").onclick = hideModal;
+  el("itemsModal").onclick = (e) => { if (e.target === el("itemsModal")) hideModal(); };
+
+  // add item
+  el("addItemBtn").onclick = () => {
+    const name = el("newItemName").value.trim();
+    const price = Number(el("newItemPrice").value);
+    const notes = el("newItemNotes").value.trim();
+    if (!name || !Number.isFinite(price)) return;
+
+    menuItems.push({ id: String(Date.now()) + Math.random(), name, price, notes });
+    el("newItemName").value = "";
+    el("newItemPrice").value = "";
+    el("newItemNotes").value = "";
+
+    renderMenu();
+    renderAdmin();
+  };
+
+  setStatus("Step 1 OK ✅ (tabs + items editor)");
+});
+</script>
+</body>
+</html>
