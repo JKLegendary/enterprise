@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Tap Debug (Inline Onclick)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:#0b0c10; color:#eaf0ff; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#11131a; position:sticky; top:0; z-index:10; }
+    .nav { display:flex; gap:8px; }
+    .navbtn { background:#1b1f2b; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:10px; font-weight:700; }
+    .active { outline:2px solid #7aa2ff; }
+    .app { padding:12px; padding-bottom:90px; }
+    .hidden { display:none !important; }
+
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .pane { background:#11131a; border:1px solid #20243a; border-radius:14px; padding:12px; }
+    .pane-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+
+    .grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; max-height:72vh; overflow:auto; padding-right:4px; }
+    .list { display:flex; flex-direction:column; gap:10px; max-height:60vh; overflow:auto; padding-right:4px; }
+
+    .tile { background:#0d0f15; border:1px solid #22263a; border-radius:12px; padding:12px; user-select:none; }
+    .tile:active { outline:2px solid #7aa2ff; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .tiny { opacity:.7; font-size:12px; }
+
+    button { touch-action: manipulation; }
+    .ghost { background:transparent; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:12px; font-weight:800; }
+    .primary { background:#7aa2ff; color:#081022; border:none; padding:12px; border-radius:12px; font-weight:900; width:100%; }
+    input { width:100%; box-sizing:border-box; padding:12px; border-radius:12px; border:1px solid #2a3042; background:#0b0c10; color:#eaf0ff; font-size:16px; }
+
+    .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+    .modal-card { width:min(820px,100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding:14px; }
+    .row2 { display:flex; gap:10px; }
+
+    .statusbar { position:fixed; left:0; right:0; bottom:0; padding:10px; background:#11131a; border-top:1px solid #20243a; z-index:9999; }
+    .banner { font-weight:900; }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div style="font-weight:900">POS Debug</div>
+    <nav class="nav">
+      <button id="nav-cashier" class="navbtn active" onclick="showView('cashier')">Cashier</button>
+      <button id="nav-cook" class="navbtn" onclick="showView('cook')">Cook</button>
+      <button id="nav-history" class="navbtn" onclick="showView('history')">History</button>
+      <button id="nav-completion" class="navbtn" onclick="showView('completion')">Completion</button>
+    </nav>
+  </header>
+
+  <main class="app">
+    <section id="view-cashier">
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Menu</h2>
+            <button class="ghost" onclick="openItems()">Items ✏️</button>
+          </div>
+          <div id="itemsGrid" class="grid"></div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Cart</h2>
+            <button class="ghost" onclick="clearCart()">Clear</button>
+          </div>
+          <div id="cartList" class="list"></div>
+          <div class="row" style="margin-top:10px;">
+            <span>Total</span>
+            <strong id="cartTotal">£0.00</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-cook" class="hidden"><div class="pane"><h2>Cook</h2><p class="tiny">Debug page</p></div></section>
+    <section id="view-history" class="hidden"><div class="pane"><h2>History</h2><p class="tiny">Debug page</p></div></section>
+    <section id="view-completion" class="hidden"><div class="pane"><h2>Completion</h2><p class="tiny">Debug page</p></div></section>
+  </main>
+
+  <!-- Items Modal -->
+  <div id="itemsModal" class="modal" onclick="modalBackdrop(event)">
+    <div class="modal-card">
+      <div class="row" style="margin-bottom:10px;">
+        <h2 style="margin:0;">Items</h2>
+        <button class="ghost" style="width:auto;" onclick="closeItems()">Close</button>
+      </div>
+
+      <div class="row2">
+        <input id="newItemName" placeholder="Name" />
+        <input id="newItemPrice" type="number" inputmode="decimal" placeholder="Price" />
+      </div>
+      <input id="newItemNotes" placeholder="Notes (optional)" />
+
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="addItem()">Add item</button>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #20243a;margin:14px 0;">
+      <div id="itemsAdminList" class="list"></div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="banner">Tap count: <span id="tapCount">0</span> • Last: <span id="lastMsg">Booting…</span></div>
+    <div class="tiny">If tap count never increases, your page is not updating / not the right URL / something is blocking taps.</div>
+  </div>
+
+<script>
+/*** Absolute click detector (proves taps reach JS) ***/
+let tapCount = 0;
+document.addEventListener("click", () => {
+  tapCount++;
+  document.getElementById("tapCount").textContent = String(tapCount);
+});
+
+/*** Minimal POS data (no Firebase) ***/
+const menuItems = [];
+const cart = new Map(); // itemId -> qty
+
+function msg(s){
+  document.getElementById("lastMsg").textContent = s;
+}
+
+function showView(view){
+  // views
+  ["cashier","cook","history","completion"].forEach(v => {
+    document.getElementById("view-"+v).classList.toggle("hidden", v !== view);
+  });
+  // nav highlight
+  ["cashier","cook","history","completion"].forEach(v => {
+    document.getElementById("nav-"+v).classList.toggle("active", v === view);
+  });
+  msg("Switched to " + view);
+}
+
+function openItems(){
+  document.getElementById("itemsModal").style.display = "flex";
+  renderAdmin();
+  msg("Opened items editor");
+}
+
+function closeItems(){
+  document.getElementById("itemsModal").style.display = "none";
+  msg("Closed items editor");
+}
+
+function modalBackdrop(e){
+  if (e.target.id === "itemsModal") closeItems();
+}
+
+function addItem(){
+  const name = document.getElementById("newItemName").value.trim();
+  const price = Number(document.getElementById("newItemPrice").value);
+  const notes = document.getElementById("newItemNotes").value.trim();
+  if (!name || !Number.isFinite(price)) { msg("Missing name/price"); return; }
+
+  const id = String(Date.now()) + Math.random();
+  menuItems.push({ id, name, price, notes });
+
+  document.getElementById("newItemName").value = "";
+  document.getElementById("newItemPrice").value = "";
+  document.getElementById("newItemNotes").value = "";
+
+  renderMenu();
+  renderAdmin();
+  msg("Added item: " + name);
+}
+
+function renderMenu(){
+  const grid = document.getElementById("itemsGrid");
+  grid.innerHTML = "";
+  for (const it of menuItems){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `<div style="font-weight:900">${it.name}</div><div class="tiny">£${it.price.toFixed(2)}</div>`;
+    tile.onclick = () => { addToCart(it.id); };
+    grid.appendChild(tile);
+  }
+}
+
+function renderAdmin(){
+  const list = document.getElementById("itemsAdminList");
+  list.innerHTML = "";
+  for (const it of menuItems){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `<div class="row"><strong>${it.name}</strong><span>£${it.price.toFixed(2)}</span></div>
+                      <div class="tiny">${it.notes || ""}</div>`;
+    list.appendChild(tile);
+  }
+}
+
+function addToCart(itemId){
+  cart.set(itemId, (cart.get(itemId) || 0) + 1);
+  renderCart();
+  const it = menuItems.find(x => x.id === itemId);
+  msg("Added to cart: " + (it ? it.name : itemId));
+}
+
+function clearCart(){
+  cart.clear();
+  renderCart();
+  msg("Cart cleared");
+}
+
+function renderCart(){
+  const list = document.getElementById("cartList");
+  list.innerHTML = "";
+  let total = 0;
+
+  for (const [itemId, qty] of cart.entries()){
+    const it = menuItems.find(x => x.id === itemId);
+    if (!it) continue;
+    total += it.price * qty;
+
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `<div class="row"><strong>${qty}× ${it.name}</strong><span>£${(it.price*qty).toFixed(2)}</span></div>`;
+    list.appendChild(tile);
+  }
+
+  document.getElementById("cartTotal").textContent = "£" + total.toFixed(2);
+}
+
+// boot message
+msg("Loaded ✅ (try tapping nav or Items ✏️)");
+</script>
+</body>
+</html>
