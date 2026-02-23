@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Step 2a (Minimal)</title>
+
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin: 0; background: #0b0c10; color: #eaf0ff; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; padding: 12px 14px; background:#11131a; position:sticky; top:0; z-index:10; }
+    .brand { font-weight:800; }
+    .nav { display:flex; gap:8px; }
+    .navbtn { background:#1b1f2b; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:10px; font-weight:700; }
+    .navbtn.active { outline:2px solid #7aa2ff; }
+
+    .app { padding:12px; padding-bottom:80px; }
+    .view { min-height: calc(100vh - 60px); }
+    .hidden { display:none !important; }
+
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+
+    .pane { background:#11131a; border:1px solid #20243a; border-radius:14px; padding:12px; }
+    .pane-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+
+    .grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; overflow:auto; max-height:72vh; padding-right:4px; }
+    .list { display:flex; flex-direction:column; gap:10px; overflow:auto; max-height:60vh; padding-right:4px; }
+
+    .tile { background:#0d0f15; border:1px solid #22263a; border-radius:12px; padding:12px; user-select:none; }
+    .tile:active { outline: 2px solid #7aa2ff; }
+    .row { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .tiny { opacity:.7; font-size:12px; }
+
+    .ghost { background: transparent; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:12px; font-weight:800; }
+    .primary { background:#7aa2ff; color:#081022; border:none; padding:12px; border-radius:12px; font-weight:900; width:100%; }
+    button { touch-action: manipulation; }
+
+    input { width:100%; box-sizing:border-box; padding:12px; border-radius:12px; border:1px solid #2a3042; background:#0b0c10; color:#eaf0ff; font-size:16px; }
+
+    .modal { position:fixed; inset:0; background: rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+    .modal-card { width:min(820px, 100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding:14px; }
+    .row2 { display:flex; gap:10px; }
+    hr { border:none; border-top:1px solid #20243a; margin:14px 0; }
+
+    .statusbar { position:fixed; left:0; right:0; bottom:0; padding:10px; background:#11131a; border-top:1px solid #20243a; z-index:9999; }
+    .banner { font-weight:900; }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">POS Step 2a</div>
+    <nav class="nav">
+      <button class="navbtn" data-view="cashier">Cashier</button>
+      <button class="navbtn" data-view="cook">Cook</button>
+      <button class="navbtn" data-view="history">History</button>
+      <button class="navbtn" data-view="completion">Completion</button>
+    </nav>
+  </header>
+
+  <main class="app">
+    <section id="view-cashier" class="view">
+      <div class="split">
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Menu</h2>
+            <button id="editItemsBtn" class="ghost">Items ✏️</button>
+          </div>
+          <div id="itemsGrid" class="grid"></div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Cart</h2>
+            <button id="clearCartBtn" class="ghost">Clear</button>
+          </div>
+          <div id="cartList" class="list"></div>
+          <div style="margin-top:10px;" class="row">
+            <span>Total</span>
+            <strong id="cartTotal">£0.00</strong>
+          </div>
+        </div>
+      </div>
+
+      <div id="itemsModal" class="modal">
+        <div class="modal-card">
+          <div class="pane-head">
+            <h2>Items</h2>
+            <button id="closeItemsBtn" class="ghost">Close</button>
+          </div>
+
+          <div class="row2">
+            <input id="newItemName" placeholder="Name" />
+            <input id="newItemPrice" type="number" inputmode="decimal" placeholder="Price" />
+          </div>
+          <input id="newItemNotes" placeholder="Notes (optional)" />
+
+          <div style="margin-top:12px;">
+            <button id="addItemBtn" class="primary">Add item</button>
+          </div>
+
+          <hr />
+          <div id="itemsAdminList" class="list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-cook" class="view hidden"><div class="pane"><h2>Cook</h2></div></section>
+    <section id="view-history" class="view hidden"><div class="pane"><h2>History</h2></div></section>
+    <section id="view-completion" class="view hidden"><div class="pane"><h2>Completion</h2></div></section>
+  </main>
+
+  <div class="statusbar">
+    <div class="banner" id="banner">JS RUNNING ✅</div>
+    <div class="tiny">Status: <span id="statusText">Booting…</span></div>
+  </div>
+
+<script>
+(() => {
+  const el = (id) => document.getElementById(id);
+  const £ = (n) => `£${(Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2)}`;
+  const setStatus = (t) => el("statusText").textContent = t;
+
+  function setView(view){
+    document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+    ["cashier","cook","history","completion"].forEach(v=>{
+      el(`view-${v}`).classList.toggle("hidden", v !== view);
+    });
+  }
+
+  function showModal(){ el("itemsModal").style.display = "flex"; }
+  function hideModal(){ el("itemsModal").style.display = "none"; }
+
+  let menuItems = [];
+  let cart = new Map(); // itemId -> qty
+
+  function renderMenu(){
+    const grid = el("itemsGrid");
+    grid.innerHTML = "";
+    for (const it of menuItems){
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.dataset.itemId = it.id;
+      tile.innerHTML = `<div style="font-weight:900">${it.name}</div><div class="tiny">£${it.price.toFixed(2)}</div>`;
+      grid.appendChild(tile);
+    }
+  }
+
+  function renderAdmin(){
+    const list = el("itemsAdminList");
+    list.innerHTML = "";
+    for (const it of menuItems){
+      const card = document.createElement("div");
+      card.className = "tile";
+      card.innerHTML = `<div class="row"><strong>${it.name}</strong><span>£${it.price.toFixed(2)}</span></div>
+                        <div class="tiny">${it.notes || ""}</div>`;
+      list.appendChild(card);
+    }
+  }
+
+  function cartTotal(){
+    let total = 0;
+    for (const [itemId, qty] of cart.entries()){
+      const it = menuItems.find(x => x.id === itemId);
+      if (it) total += it.price * qty;
+    }
+    return total;
+  }
+
+  function renderCart(){
+    const list = el("cartList");
+    list.innerHTML = "";
+    for (const [itemId, qty] of cart.entries()){
+      const it = menuItems.find(x => x.id === itemId);
+      if (!it) continue;
+      const row = document.createElement("div");
+      row.className = "tile";
+      row.innerHTML = `<div class="row"><strong>${qty}× ${it.name}</strong><span>${£(it.price * qty)}</span></div>`;
+      list.appendChild(row);
+    }
+    el("cartTotal").textContent = £(cartTotal());
+  }
+
+  function addToCart(itemId){
+    const it = menuItems.find(x => x.id === itemId);
+    if (!it) return;
+    cart.set(itemId, (cart.get(itemId) || 0) + 1);
+    renderCart();
+  }
+
+  window.addEventListener("error", (e) => {
+    el("banner").textContent = "SCRIPT CRASHED ❌";
+    setStatus(String(e.message || e.error || "Unknown error"));
+  });
+
+  function init(){
+    // nav
+    document.querySelectorAll(".navbtn").forEach(b => b.onclick = () => setView(b.dataset.view));
+    setView("cashier");
+
+    // modal
+    el("editItemsBtn").onclick = () => { showModal(); renderAdmin(); };
+    el("closeItemsBtn").onclick = hideModal;
+    el("itemsModal").onclick = (e) => { if (e.target === el("itemsModal")) hideModal(); };
+
+    // add item
+    el("addItemBtn").onclick = () => {
+      const name = el("newItemName").value.trim();
+      const price = Number(el("newItemPrice").value);
+      const notes = el("newItemNotes").value.trim();
+      if (!name || !Number.isFinite(price)) return;
+
+      menuItems.push({ id: String(Date.now()) + Math.random(), name, price, notes });
+      el("newItemName").value = "";
+      el("newItemPrice").value = "";
+      el("newItemNotes").value = "";
+
+      renderMenu();
+      renderAdmin();
+      setStatus("Item added ✅");
+    };
+
+    // clear cart
+    el("clearCartBtn").onclick = () => { cart.clear(); renderCart(); setStatus("Cart cleared"); };
+
+    // menu taps (event delegation)
+    el("itemsGrid").onclick = (e) => {
+      const tile = e.target.closest(".tile");
+      if (!tile) return;
+      addToCart(tile.dataset.itemId);
+      setStatus("Added to cart ✅");
+    };
+
+    renderMenu();
+    renderCart();
+    setStatus("Step 2a OK ✅ (menu taps -> cart)");
+  }
+
+  // ✅ Key fix: run init even if DOMContentLoaded already happened
+  if (document.readyState !== "loading") init();
+  else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
