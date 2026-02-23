@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POS Test</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#111;color:white}
+.top{display:flex;justify-content:space-between;padding:12px;background:#1a1a1a}
+button{padding:12px;margin:4px;border:none;border-radius:8px}
+.nav button{background:#333;color:white}
+.active{outline:2px solid #7aa2ff}
+.view{display:none;padding:20px}
+.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>Enterprise POS</div>
+  <div class="nav">
+    <button data-view="cashier">Cashier</button>
+    <button data-view="cook">Cook</button>
+    <button data-view="history">History</button>
+    <button data-view="completion">Completion</button>
+  </div>
+</div>
+
+<div id="cashier" class="view show">
+  <h2>Cashier</h2>
+  <button id="testBtn">Test Button</button>
+</div>
+
+<div id="cook" class="view">
+  <h2>Cook</h2>
+</div>
+
+<div id="history" class="view">
+  <h2>History</h2>
+</div>
+
+<div id="completion" class="view">
+  <h2>Completion</h2>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  // NAVIGATION
+  document.querySelectorAll(".nav button").forEach(btn=>{
+    btn.onclick = () => {
+      document.querySelectorAll(".view").forEach(v=>v.classList.remove("show"));
+      document.getElementById(btn.dataset.view).classList.add("show");
+
+      document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+    };
+  });
+
+  // Test button
+  document.getElementById("testBtn").onclick = () => {
+    alert("Buttons are wired correctly ✅");
+  };
+
+});
+</script>
+
+</body>
+</html>
