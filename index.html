@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Step 3 (Pay + Cook)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:#0b0c10; color:#eaf0ff; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#11131a; position:sticky; top:0; z-index:10; }
+    .nav { display:flex; gap:8px; }
+    .navbtn { background:#1b1f2b; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:10px; font-weight:700; }
+    .active { outline:2px solid #7aa2ff; }
+    .app { padding:12px; padding-bottom:90px; }
+    .hidden { display:none !important; }
+
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .pane { background:#11131a; border:1px solid #20243a; border-radius:14px; padding:12px; }
+    .pane-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+
+    .grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; max-height:72vh; overflow:auto; padding-right:4px; }
+    .list { display:flex; flex-direction:column; gap:10px; max-height:60vh; overflow:auto; padding-right:4px; }
+
+    .tile { background:#0d0f15; border:1px solid #22263a; border-radius:12px; padding:12px; user-select:none; }
+    .tile:active { outline:2px solid #7aa2ff; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .tiny { opacity:.7; font-size:12px; }
+
+    button { touch-action: manipulation; }
+    .ghost { background:transparent; color:#eaf0ff; border:1px solid #2a3042; padding:10px 12px; border-radius:12px; font-weight:800; }
+    .primary { background:#7aa2ff; color:#081022; border:none; padding:12px; border-radius:12px; font-weight:900; width:100%; }
+    .qtybtn { background:#1b1f2b; color:#eaf0ff; border:1px solid #2a3042; padding:8px 12px; border-radius:10px; font-weight:900; }
+
+    input { width:100%; box-sizing:border-box; padding:12px; border-radius:12px; border:1px solid #2a3042; background:#0b0c10; color:#eaf0ff; font-size:16px; }
+
+    .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+    .modal-card { width:min(820px,100%); background:#11131a; border:1px solid #20243a; border-radius:14px; padding:14px; }
+    .row2 { display:flex; gap:10px; }
+
+    .paywrap { max-width:560px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+    .err { color:#ff8a8a; min-height:18px; }
+
+    .statusbar { position:fixed; left:0; right:0; bottom:0; padding:10px; background:#11131a; border-top:1px solid #20243a; z-index:9999; }
+    .banner { font-weight:900; }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div style="font-weight:900">POS Step 3</div>
+    <nav class="nav">
+      <button id="nav-cashier" class="navbtn active" onclick="showView('cashier')">Cashier</button>
+      <button id="nav-cook" class="navbtn" onclick="showView('cook')">Cook</button>
+      <button id="nav-history" class="navbtn" onclick="showView('history')">History</button>
+      <button id="nav-completion" class="navbtn" onclick="showView('completion')">Completion</button>
+    </nav>
+  </header>
+
+  <main class="app">
+    <!-- CASHIER -->
+    <section id="view-cashier">
+      <!-- Cashier main -->
+      <div id="cashierMain">
+        <div class="split">
+          <div class="pane">
+            <div class="pane-head">
+              <h2>Menu</h2>
+              <button class="ghost" onclick="openItems()">Items ✏️</button>
+            </div>
+            <div id="itemsGrid" class="grid"></div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-head">
+              <h2>Cart</h2>
+              <button class="ghost" onclick="clearCart()">Clear</button>
+            </div>
+            <div id="cartList" class="list"></div>
+
+            <div class="row" style="margin-top:10px;">
+              <span>Total</span>
+              <strong id="cartTotal">£0.00</strong>
+            </div>
+
+            <div style="margin-top:10px;">
+              <button class="primary" onclick="openPay()">Pay</button>
+            </div>
+
+            <div style="margin-top:14px;">
+              <h3 style="margin:0 0 10px 0;">Ready orders</h3>
+              <div id="cashierReadyList" class="list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pay view -->
+      <div id="cashierPay" class="hidden">
+        <div class="pane">
+          <div class="pane-head">
+            <h2>Payment</h2>
+            <button class="ghost" onclick="closePay()">Back</button>
+          </div>
+
+          <div class="paywrap">
+            <div class="row" style="font-size:20px;">
+              <span>Amount due</span>
+              <strong id="dueAmt">£0.00</strong>
+            </div>
+
+            <div>
+              <div class="tiny" style="margin-bottom:6px;">Amount given</div>
+              <input id="givenInput" type="number" inputmode="decimal" placeholder="0.00" oninput="updateChange()">
+            </div>
+
+            <div class="row" style="font-size:20px;">
+              <span>Change</span>
+              <strong id="changeAmt">£0.00</strong>
+            </div>
+
+            <div class="row2">
+              <button class="ghost" onclick="closePay()">Cancel</button>
+              <button class="primary" onclick="completePay()">Complete</button>
+            </div>
+
+            <div class="err" id="payErr"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COOK -->
+    <section id="view-cook" class="hidden">
+      <div class="pane">
+        <div class="pane-head">
+          <h2>Orders (Cooking)</h2>
+          <span class="tiny">Tap order to expand</span>
+        </div>
+        <div id="cookOrders" class="list"></div>
+      </div>
+    </section>
+
+    <!-- HISTORY placeholder -->
+    <section id="view-history" class="hidden"><div class="pane"><h2>History</h2><p class="tiny">Next step</p></div></section>
+
+    <!-- COMPLETION placeholder -->
+    <section id="view-completion" class="hidden"><div class="pane"><h2>Completion</h2><p class="tiny">Next step</p></div></section>
+  </main>
+
+  <!-- Items Modal -->
+  <div id="itemsModal" class="modal" onclick="modalBackdrop(event)">
+    <div class="modal-card">
+      <div class="row" style="margin-bottom:10px;">
+        <h2 style="margin:0;">Items</h2>
+        <button class="ghost" style="width:auto;" onclick="closeItems()">Close</button>
+      </div>
+
+      <div class="row2">
+        <input id="newItemName" placeholder="Name" />
+        <input id="newItemPrice" type="number" inputmode="decimal" placeholder="Price" />
+      </div>
+      <input id="newItemNotes" placeholder="Notes (optional)" />
+
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="addItem()">Add item</button>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #20243a;margin:14px 0;">
+      <div id="itemsAdminList" class="list"></div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="banner">Last: <span id="lastMsg">Booting…</span></div>
+    <div class="tiny">Step 3: pay creates COOKING order; cook can mark READY.</div>
+  </div>
+
+<script>
+/*** Data (still no Firebase) ***/
+const menuItems = [];
+const cart = new Map(); // itemId -> qty
+let nextOrderNumber = 1;
+const orders = []; // {id, number, status, lines, total, paid, change, createdAt, readyAt}
+
+function money(n){ return "£" + Number(n).toFixed(2); }
+function msg(s){ document.getElementById("lastMsg").textContent = s; }
+
+function showView(view){
+  ["cashier","cook","history","completion"].forEach(v => {
+    document.getElementById("view-"+v).classList.toggle("hidden", v !== view);
+    document.getElementById("nav-"+v).classList.toggle("active", v === view);
+  });
+  msg("Switched to " + view);
+}
+
+/*** Modal ***/
+function openItems(){
+  document.getElementById("itemsModal").style.display = "flex";
+  renderAdmin();
+  msg("Opened items editor");
+}
+function closeItems(){
+  document.getElementById("itemsModal").style.display = "none";
+  msg("Closed items editor");
+}
+function modalBackdrop(e){
+  if (e.target.id === "itemsModal") closeItems();
+}
+
+/*** Items ***/
+function addItem(){
+  const name = document.getElementById("newItemName").value.trim();
+  const price = Number(document.getElementById("newItemPrice").value);
+  const notes = document.getElementById("newItemNotes").value.trim();
+  if (!name || !Number.isFinite(price)) { msg("Missing name/price"); return; }
+
+  const id = String(Date.now()) + Math.random();
+  menuItems.push({ id, name, price, notes });
+
+  document.getElementById("newItemName").value = "";
+  document.getElementById("newItemPrice").value = "";
+  document.getElementById("newItemNotes").value = "";
+
+  renderMenu();
+  renderAdmin();
+  msg("Added item: " + name);
+}
+
+function renderMenu(){
+  const grid = document.getElementById("itemsGrid");
+  grid.innerHTML = "";
+  for (const it of menuItems){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `<div style="font-weight:900">${it.name}</div><div class="tiny">${money(it.price)}</div>`;
+    tile.onclick = () => addToCart(it.id);
+    grid.appendChild(tile);
+  }
+}
+
+function renderAdmin(){
+  const list = document.getElementById("itemsAdminList");
+  list.innerHTML = "";
+  for (const it of menuItems){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `
+      <div class="row">
+        <div>
+          <div style="font-weight:900">${it.name}</div>
+          <div class="tiny">${it.notes || ""}</div>
+        </div>
+        <div style="font-weight:900">${money(it.price)}</div>
+      </div>
+    `;
+    list.appendChild(tile);
+  }
+}
+
+/*** Cart ***/
+function addToCart(itemId){
+  cart.set(itemId, (cart.get(itemId) || 0) + 1);
+  renderCart();
+  const it = menuItems.find(x => x.id === itemId);
+  msg("Added to cart: " + (it ? it.name : itemId));
+}
+
+function incQty(itemId){
+  cart.set(itemId, (cart.get(itemId) || 0) + 1);
+  renderCart();
+}
+function decQty(itemId){
+  const q = cart.get(itemId) || 0;
+  if (q <= 1) cart.delete(itemId);
+  else cart.set(itemId, q - 1);
+  renderCart();
+}
+function clearCart(){
+  cart.clear();
+  renderCart();
+  msg("Cart cleared");
+}
+
+function cartTotal(){
+  let total = 0;
+  for (const [itemId, qty] of cart.entries()){
+    const it = menuItems.find(x => x.id === itemId);
+    if (it) total += it.price * qty;
+  }
+  return total;
+}
+
+function renderCart(){
+  const list = document.getElementById("cartList");
+  list.innerHTML = "";
+  let total = 0;
+
+  for (const [itemId, qty] of cart.entries()){
+    const it = menuItems.find(x => x.id === itemId);
+    if (!it) continue;
+    total += it.price * qty;
+
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `
+      <div class="row">
+        <div>
+          <div style="font-weight:900">${it.name}</div>
+          <div class="tiny">${money(it.price)} each</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="qtybtn" onclick="decQty('${itemId}')">−</button>
+          <strong style="min-width:26px;text-align:center;">${qty}</strong>
+          <button class="qtybtn" onclick="incQty('${itemId}')">+</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <span class="tiny">Line total</span>
+        <strong>${money(it.price * qty)}</strong>
+      </div>
+    `;
+    list.appendChild(tile);
+  }
+
+  document.getElementById("cartTotal").textContent = money(total);
+}
+
+/*** Pay view ***/
+function openPay(){
+  if (cart.size === 0) { msg("Cart is empty"); return; }
+  document.getElementById("payErr").textContent = "";
+  document.getElementById("givenInput").value = "";
+  document.getElementById("dueAmt").textContent = money(cartTotal());
+  document.getElementById("changeAmt").textContent = money(0);
+
+  document.getElementById("cashierMain").classList.add("hidden");
+  document.getElementById("cashierPay").classList.remove("hidden");
+  msg("Pay opened");
+}
+
+function closePay(){
+  document.getElementById("cashierPay").classList.add("hidden");
+  document.getElementById("cashierMain").classList.remove("hidden");
+  msg("Back to cashier");
+}
+
+function updateChange(){
+  const due = cartTotal();
+  const given = Number(document.getElementById("givenInput").value);
+  const change = Number.isFinite(given) ? (given - due) : 0;
+  document.getElementById("changeAmt").textContent = money(Math.max(0, change));
+}
+
+function completePay(){
+  const due = cartTotal();
+  const given = Number(document.getElementById("givenInput").value);
+
+  if (!Number.isFinite(given) || given < due){
+    document.getElementById("payErr").textContent = "Amount given must be at least the amount due.";
+    msg("Pay error");
+    return;
+  }
+
+  if (!confirm("Complete payment and send order to cook?")) return;
+
+  // Build order lines
+  const lines = [];
+  for (const [itemId, qty] of cart.entries()){
+    const it = menuItems.find(x => x.id === itemId);
+    if (!it) continue;
+    lines.push({ itemId, name: it.name, price: it.price, qty });
+  }
+
+  const order = {
+    id: String(Date.now()) + Math.random(),
+    number: nextOrderNumber++,
+    status: "COOKING",
+    lines,
+    total: due,
+    paid: given,
+    change: given - due,
+    createdAt: Date.now(),
+    readyAt: null,
+  };
+  orders.push(order);
+
+  cart.clear();
+  renderCart();
+  closePay();
+
+  renderCook();
+  renderCashierReady();
+  msg("Order #" + order.number + " sent to cook ✅");
+  alert("Order #" + order.number + " confirmed ✅");
+}
+
+/*** Cook view (expand inline) ***/
+function renderCook(){
+  const list = document.getElementById("cookOrders");
+  list.innerHTML = "";
+
+  const cooking = orders.filter(o => o.status === "COOKING").sort((a,b)=>b.createdAt-a.createdAt);
+
+  for (const o of cooking){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+
+    const linesHtml = o.lines.map(l =>
+      `<div class="row"><span>${l.qty}× ${l.name}</span><span>${money(l.price*l.qty)}</span></div>`
+    ).join("");
+
+    tile.innerHTML = `
+      <div class="row">
+        <div style="font-weight:900;font-size:18px;">Order #${o.number}</div>
+        <button class="primary" style="width:auto;padding:10px 12px;" onclick="markReady(${o.number})">✅</button>
+      </div>
+      <div class="tiny" style="margin-top:6px;">Tap to expand</div>
+      <div id="details-${o.number}" class="hidden" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+        ${linesHtml}
+        <div class="row"><strong>Total</strong><strong>${money(o.total)}</strong></div>
+      </div>
+    `;
+
+    // expand/collapse when tapping tile (but not the ✅ button)
+    tile.onclick = (ev) => {
+      if (ev.target && ev.target.tagName === "BUTTON") return;
+      const d = document.getElementById("details-" + o.number);
+      d.classList.toggle("hidden");
+    };
+
+    list.appendChild(tile);
+  }
+}
+
+function markReady(orderNumber){
+  const o = orders.find(x => x.number === orderNumber);
+  if (!o) return;
+  if (!confirm("Mark Order #" + orderNumber + " as READY?")) return;
+  o.status = "READY";
+  o.readyAt = Date.now();
+  renderCook();
+  renderCashierReady();
+  msg("Order #" + orderNumber + " READY ✅");
+}
+
+/*** Cashier ready list ***/
+function renderCashierReady(){
+  const list = document.getElementById("cashierReadyList");
+  list.innerHTML = "";
+  const ready = orders.filter(o => o.status === "READY").sort((a,b)=>(b.readyAt||0)-(a.readyAt||0));
+  for (const o of ready){
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.innerHTML = `<div class="row"><strong>Order #${o.number}</strong><span class="tiny">READY</span></div>`;
+    list.appendChild(tile);
+  }
+}
+
+// Boot
+msg("Loaded ✅ (add items → pay → cook)");
+renderMenu();
+renderCart();
+renderCook();
+renderCashierReady();
+</script>
+</body>
+</html>
